@@ -1,8 +1,12 @@
 extends layout
 
 block content
+  - var balanceValue = Number((address.received - address.sent) / 100000000);
+  - var market_currency = (settings.markets_page.market_price == 'COINGECKO' ? (settings.markets_page.coingecko_currency == null || settings.markets_page.coingecko_currency == '' ? '' : settings.markets_page.coingecko_currency) : (settings.markets_page.default_exchange.trading_pair != null && settings.markets_page.default_exchange.trading_pair.indexOf('/') > -1 ? settings.markets_page.default_exchange.trading_pair.split('/')[1] : '')).toUpperCase();
   script.
     var hashAddress = "#{address.a_id}";
+    var marketCurrency = "#{market_currency.toLowerCase()}";
+    var balanceValue = #{balanceValue};
     var setting_maxTxCount = parseInt("#{settings.api_page.public_apis.ext.getaddresstxs.max_items_per_query}");
     var setting_txPerPage = parseInt("#{settings.address_page.history_table.items_per_page}");
     var lengthMenuOptsAdd = !{JSON.stringify(settings.address_page.history_table.page_length_options)};
@@ -116,10 +120,18 @@ block content
           fixDataTableColumns();
         }
       });
+      $.getJSON('/ext/getcurrentprice', function(data) {
+        var lastPrice = data['last_price_' + marketCurrency];
+        if (lastPrice != null) {
+          var balanceFiat = Number(balanceValue * lastPrice).toLocaleString('en', {'minimumFractionDigits':2,'maximumFractionDigits':8,'useGrouping':true});
+          var balanceFiatParts = balanceFiat.split('.');
+          $('#balance-usd').html(balanceFiatParts[0] + '.<span class="decimal">' + balanceFiatParts[1] + '</span>');
+        }
+      });
       if (#{settings.shared_pages.page_header.page_title_image.enable_animation} == true && #{settings.address_page.page_header.show_img} == true)
         startRotateElement('img#header-img');
     });
-  - var balance = Number((address.received - address.sent) / 100000000).toLocaleString('en',{'minimumFractionDigits':2,'maximumFractionDigits':8,'useGrouping':true});
+  - var balance = balanceValue.toLocaleString('en',{'minimumFractionDigits':2,'maximumFractionDigits':8,'useGrouping':true});
   - var balanceParts = balance.split('.');
   - var sent = Number(address.sent /100000000).toLocaleString('en',{'minimumFractionDigits':2,'maximumFractionDigits':8,'useGrouping':true});
   - var sentParts = sent.split('.');
@@ -167,6 +179,8 @@ block content
         thead
           tr(class=theadClasses)
             th.text-center #{settings.localization.rl_balance}
+              span.small.fw-normal  (#{market_currency})
+            th.text-center #{settings.localization.rl_balance}
               span.small.fw-normal  (#{settings.coin.symbol})
             if settings.address_page.show_sent_received == true
               th.text-center #{settings.localization.total_sent}
@@ -177,6 +191,7 @@ block content
             th.text-center #{settings.localization.a_qr}
         tbody
           tr
+            td#balance-usd.text-center.addr-summary -
             td.text-center.addr-summary #{balanceParts[0]}.
               span.decimal #{balanceParts[1]}
             if settings.address_page.show_sent_received == true
